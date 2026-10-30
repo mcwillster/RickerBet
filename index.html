@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermes Live Sportsbook</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-bg: #2a2a2a;
+            --text-main: #f0f0f0;
+            --text-muted: #999;
+            --accent-red: #ee382b;
+            --accent-green: #84ee64;
+            --border-color: #444;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; }
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 2px solid var(--accent-red); margin-bottom: 20px; }
+        h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .account-info { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .ip-display { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+        .balance-display { font-size: 20px; font-weight: bold; color: var(--accent-green); background: #111; padding: 10px 20px; border-radius: 5px; border: 1px solid var(--border-color); }
+        
+        main { display: flex; gap: 20px; flex: 1; min-height: 0; }
+        .betting-board { flex: 3; background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; }
+        .controls { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; gap: 10px; align-items: center; background: #222; }
+        .controls button { padding: 8px 16px; cursor: pointer; background: var(--accent-red); color: white; border: none; border-radius: 4px; font-weight: bold; text-transform: uppercase; }
+        .controls button:hover { opacity: 0.9; }
+        .controls .status { font-size: 14px; color: var(--text-muted); }
+        
+        .team-grid-container { flex: 1; overflow-y: auto; padding: 15px; }
+        .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        .team-card { background: #333; padding: 15px; border-radius: 6px; border-left: 4px solid var(--text-muted); transition: transform 0.2s; display: flex; flex-direction: column; justify-content: space-between; }
+        .team-card:hover { transform: translateY(-2px); }
+        .team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .team-name { font-size: 18px; font-weight: bold; text-transform: uppercase; }
+        .team-score { font-family: monospace; font-size: 16px; color: #ddd; }
+        .team-stats { font-size: 13px; color: var(--text-muted); margin-bottom: 15px; line-height: 1.5; }
+        .team-stats span { color: var(--text-main); font-weight: bold; }
+        .odds-btn { width: 100%; padding: 10px; background: #444; border: 1px solid #555; color: var(--accent-green); font-weight: bold; font-size: 16px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+        .odds-btn:hover { background: #555; }
+        
+        .bet-slip { flex: 1; background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); padding: 15px; display: flex; flex-direction: column; }
+        .bet-slip h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .active-bets { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .bet-item { background: #222; padding: 10px; border-radius: 4px; border-left: 3px solid var(--accent-green); font-size: 14px; }
+        
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 50; }
+        .modal-content { background: var(--panel-bg); padding: 25px; border-radius: 8px; width: 300px; border: 1px solid var(--border-color); }
+        .modal input { width: 100%; padding: 10px; margin: 15px 0; background: #111; color: white; border: 1px solid #555; border-radius: 4px; }
+        .modal button { width: 100%; padding: 10px; background: var(--accent-green); color: black; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; }
+        .modal button.cancel { background: #555; color: white; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Hermes Live Sportsbook</h1>
+        <div class="account-info">
+            <div class="ip-display" id="userIp">Connecting...</div>
+            <div class="balance-display">Balance: $<span id="balance">0.00</span></div>
+        </div>
+    </header>
+
+    <main>
+        <div class="betting-board">
+            <div class="controls">
+                <button id="toggleSyncBtn">Start Auto-Sync</button>
+                <span class="status" id="syncStatus">Sync Offline</span>
+            </div>
+            <div class="team-grid-container">
+                <div class="team-grid" id="teamGrid"></div>
+            </div>
+        </div>
+
+        <div class="bet-slip">
+            <h2>My Active Bets</h2>
+            <div class="active-bets" id="activeBets"></div>
+        </div>
+    </main>
+
+    <div class="modal" id="betModal">
+        <div class="modal-content">
+            <h3 id="modalTeamName">Place Bet</h3>
+            <p>Odds: <span id="modalOdds" style="color: var(--accent-green); font-weight: bold;"></span></p>
+            <input type="number" id="betAmount" placeholder="Enter amount ($)" min="1">
+            <button id="confirmBetBtn">Place Wager</button>
+            <button class="cancel" id="cancelBetBtn">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        let syncInterval = null;
+        let selectedTeamForBet = null;
+        let latestTeamsData = [];
+
+        const teamGrid = document.getElementById('teamGrid');
+        const activeBetsContainer = document.getElementById('activeBets');
+        const balanceEl = document.getElementById('balance');
+        const userIpEl = document.getElementById('userIp');
+        const syncStatus = document.getElementById('syncStatus');
+        
+        const modal = document.getElementById('betModal');
+        const modalTeamName = document.getElementById('modalTeamName');
+        const modalOdds = document.getElementById('modalOdds');
+        const betAmountInput = document.getElementById('betAmount');
+
+        // Fetch Account details on load based on IP
+        async function fetchAccount() {
+            try {
+                const response = await fetch('/api/account');
+                const data = await response.json();
+                if (data.ip) {
+                    userIpEl.textContent = `User IP: ${data.ip}`;
+                    updateWalletUI(data.account);
+                }
+            } catch (err) {
+                console.error("Failed to fetch account data");
+            }
+        }
+
+        function updateWalletUI(account) {
+            balanceEl.textContent = account.balance.toFixed(2);
+            activeBetsContainer.innerHTML = '';
+            
+            // Reverse so newest bets appear at the top
+            const bets = [...account.bets].reverse();
+            bets.forEach(bet => {
+                const el = document.createElement('div');
+                el.className = 'bet-item';
+                el.innerHTML = `
+                    <div style="font-weight:bold; margin-bottom:5px;">${bet.team}</div>
+                    Wager: $${bet.amount.toFixed(2)} @ ${bet.odds}x<br>
+                    <span style="color:var(--accent-green)">To Win: $${bet.potentialPayout}</span>
+                `;
+                activeBetsContainer.appendChild(el);
+            });
+        }
+
+        // Initialize Account
+        fetchAccount();
+
+        document.getElementById('toggleSyncBtn').addEventListener('click', (e) => {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+                e.target.textContent = "Start Auto-Sync";
+                e.target.style.background = "var(--accent-red)";
+                syncStatus.textContent = "Sync Offline";
+            } else {
+                fetchScoreboard(); 
+                syncInterval = setInterval(fetchScoreboard, 60000); 
+                e.target.textContent = "Stop Auto-Sync";
+                e.target.style.background = "#555";
+                syncStatus.textContent = "Requesting Backend Odds Data...";
+            }
+        });
+
+        async function fetchScoreboard() {
+            try {
+                const response = await fetch('/api/odds');
+                const data = await response.json();
+                
+                if (data.teams) {
+                    syncStatus.textContent = data.status;
+                    latestTeamsData = data.teams;
+                    renderGrid();
+                } else if (data.error) {
+                    syncStatus.textContent = "API Error: " + data.error;
+                }
+            } catch (err) {
+                syncStatus.textContent = "Connection failed. Is the Python server running?";
+            }
+        }
+
+        function renderGrid() {
+            teamGrid.innerHTML = '';
+            latestTeamsData.forEach(team => {
+                const card = document.createElement('div');
+                card.className = 'team-card';
+                card.innerHTML = `
+                    <div>
+                        <div class="team-header">
+                            <span class="team-name">${team.name}</span>
+                            <span class="team-score">${team.pts.toLocaleString()} pts</span>
+                        </div>
+                        <div class="team-stats">
+                            Active Tiles: <span>${team.upTiles} / 11</span><br>
+                            SLA Downtime Penalty: <span>${team.downPenalty > 0 ? '+' + team.downPenalty : '0'}</span>
+                        </div>
+                    </div>
+                    <button class="odds-btn" onclick="openModal('${team.name}', ${team.odds})">
+                        Bet @ ${team.odds}x
+                    </button>
+                `;
+                teamGrid.appendChild(card);
+            });
+        }
+
+        function openModal(teamName, odds) {
+            selectedTeamForBet = { teamName, odds };
+            modalTeamName.textContent = `Wager on ${teamName}`;
+            modalOdds.textContent = odds + 'x';
+            betAmountInput.value = '';
+            modal.style.display = 'flex';
+        }
+
+        document.getElementById('cancelBetBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        document.getElementById('confirmBetBtn').addEventListener('click', async () => {
+            const amount = parseFloat(betAmountInput.value);
+            if (isNaN(amount) || amount <= 0) return alert('Enter a valid bet amount.');
+            
+            // Post bet to backend
+            try {
+                const response = await fetch('/api/bet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        team: selectedTeamForBet.teamName,
+                        amount: amount,
+                        odds: parseFloat(selectedTeamForBet.odds)
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.error) {
+                    alert(data.error);
+                } else if (data.success) {
+                    updateWalletUI(data.account);
+                    modal.style.display = 'none';
+                }
+            } catch (err) {
+                alert('Failed to place bet. Check connection.');
+            }
+        });
+    </script>
+</body>
+</html>

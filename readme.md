@@ -1,0 +1,2 @@
+pip install fastapi uvicorn playwright beautifulsoup4 pydantic
+playwright install chromium

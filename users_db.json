@@ -1,6 +1,6 @@
 {
     "127.0.0.1": {
-        "balance": 1800.0,
+        "balance": 1950.0,
         "bets": [
             {
                 "team": "Race: Red (Winner: Blue)",
@@ -25,6 +25,48 @@
                 "amount": 200.0,
                 "odds": 4.0,
                 "potentialPayout": 800.0
+            },
+            {
+                "team": "Race: Blue (Winner: Blue)",
+                "amount": 100.0,
+                "odds": 4.0,
+                "potentialPayout": 400.0
+            },
+            {
+                "team": "Race: Blue (Winner: Yellow)",
+                "amount": 100.0,
+                "odds": 4.0,
+                "potentialPayout": 0
+            },
+            {
+                "team": "Race: Blue (Winner: Blue)",
+                "amount": 100.0,
+                "odds": 4.0,
+                "potentialPayout": 400.0
+            },
+            {
+                "team": "Race: Red (Winner: Yellow)",
+                "amount": 100.0,
+                "odds": 4.0,
+                "potentialPayout": 0
+            },
+            {
+                "team": "Race: Red (Winner: Blue)",
+                "amount": 100.0,
+                "odds": 4.0,
+                "potentialPayout": 0
+            },
+            {
+                "team": "Race: Red (Winner: Yellow)",
+                "amount": 100.0,
+                "odds": 4.0,
+                "potentialPayout": 0
+            },
+            {
+                "team": "Race: Red (Winner: Yellow)",
+                "amount": 50.0,
+                "odds": 4.0,
+                "potentialPayout": 0
             }
         ]
     }

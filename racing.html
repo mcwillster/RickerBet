@@ -27,26 +27,42 @@
         nav a { padding: 10px 20px; background: #333; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-right: 10px; border: 1px solid var(--border-color); }
         nav a.active { background: var(--accent-red); border-color: var(--accent-red); }
 
-        .race-container { display: flex; gap: 20px; flex: 1; }
-        .track-panel { flex: 3; background: #222; border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: space-around; }
+        .race-container { display: flex; gap: 20px; flex: 1; min-height: 0; }
         
-        .lane { position: relative; height: 60px; border-bottom: 2px dashed #555; display: flex; align-items: center; }
-        .lane:last-child { border-bottom: none; }
-        .finish-line { position: absolute; right: 10%; top: 0; bottom: 0; width: 10px; background: repeating-linear-gradient(45deg, #fff, #fff 10px, #000 10px, #000 20px); z-index: 1; }
+        /* Your custom track image is set as the background here */
+        .track-panel { 
+            flex: 3; 
+            background-color: #1e3a1e; 
+            background-image: url('track_bg.png'); 
+            background-size: cover; 
+            background-position: center;
+            background-repeat: no-repeat;
+            border-radius: 8px; 
+            border: 1px solid var(--border-color); 
+            position: relative; 
+            overflow: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
         
-        .car { position: absolute; left: 0; width: 60px; height: 30px; border-radius: 5px; z-index: 2; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-        #car-Red { background-color: #ff4444; }
-        #car-Blue { background-color: #4444ff; }
-        #car-Green { background-color: #44ff44; }
-        #car-Yellow { background-color: #ffff44; }
+        #track-svg { width: 100%; height: 100%; }
+        
+        .car { 
+            offset-anchor: center;
+            transform-box: fill-box;
+            transform-origin: center;
+            /* All offset lanes removed so cars stack perfectly on top of each other */
+        }
 
-        .betting-panel { flex: 1; background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; }
+        .betting-panel { flex: 1; background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
         .betting-panel h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .betting-panel p { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
         .betting-panel select, .betting-panel input { width: 100%; padding: 10px; margin-bottom: 15px; background: #111; color: white; border: 1px solid #555; border-radius: 4px; }
         .betting-panel button { width: 100%; padding: 12px; background: var(--accent-green); color: black; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
         .betting-panel button:disabled { background: #555; cursor: not-allowed; }
 
-        #raceResult { margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center; height: 30px; }
+        #raceResult { margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center; min-height: 30px; }
     </style>
 </head>
 <body>
@@ -66,16 +82,24 @@
 
     <div class="race-container">
         <div class="track-panel">
-            <div class="finish-line"></div>
-            <div class="lane"><div class="car" id="car-Red"></div></div>
-            <div class="lane"><div class="car" id="car-Blue"></div></div>
-            <div class="lane"><div class="car" id="car-Green"></div></div>
-            <div class="lane"><div class="car" id="car-Yellow"></div></div>
+            <svg id="track-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+                
+                <!-- The Invisible Guide Rail the cars actually follow. 
+                     Currently set to red stroke so you can see it while you draw/align your SVG path to the background image.
+                     Change to 'transparent' when finished. -->
+                <path id="invisible-guide-line" fill="none" stroke="red" stroke-width="2" />
+                
+                <!-- Cars are now perfect circles -->
+                <circle id="car-Red" class="car" fill="#ff4444" r="10" />
+                <circle id="car-Blue" class="car" fill="#4444ff" r="10" />
+                <circle id="car-Green" class="car" fill="#44ff44" r="10" />
+                <circle id="car-Yellow" class="car" fill="#ffff44" r="10" />
+            </svg>
         </div>
 
         <div class="betting-panel">
             <h2>Place Race Bet</h2>
-            <p style="color: var(--text-muted); font-size: 14px;">Select a car. Winner pays 4.0x your wager.</p>
+            <p>Select a car. Winner pays 4.0x your wager. Race takes place on the custom circuit.</p>
             
             <label>Select Car:</label>
             <select id="carSelect">
@@ -98,6 +122,11 @@
         const userIpEl = document.getElementById('userIp');
         const startBtn = document.getElementById('startRaceBtn');
         const resultDisplay = document.getElementById('raceResult');
+        let currentAnimations = [];
+
+        // Replace this path string with your new custom path you trace over the PNG image
+        const customGuidePath = "M 350 460 L 120 440 C 40 430, 30 280, 70 200 C 90 150, 160 150, 200 120 C 260 70, 290 40, 360 40 L 680 40 C 700 40, 710 70, 730 70 C 750 70, 760 40, 780 40 C 910 40, 940 150, 830 230 C 770 280, 720 290, 700 330 C 680 370, 700 400, 740 400 L 920 400 C 970 400, 970 460, 920 460 L 630 460 C 580 460, 620 330, 530 330 C 430 330, 450 460, 350 460 Z";
+        const pathStr = `path('${customGuidePath}')`;
 
         async function fetchAccount() {
             try {
@@ -112,7 +141,22 @@
             }
         }
 
+        function resetBoard() {
+            currentAnimations.forEach(anim => anim.cancel());
+            currentAnimations = [];
+
+            document.getElementById('invisible-guide-line').setAttribute('d', customGuidePath);
+            
+            const cars = ["Red", "Blue", "Green", "Yellow"];
+            cars.forEach(c => {
+                const el = document.getElementById(`car-${c}`);
+                el.style.offsetPath = pathStr;
+                el.style.offsetDistance = '0%';
+            });
+        }
+
         fetchAccount();
+        resetBoard();
 
         startBtn.addEventListener('click', async () => {
             const car = document.getElementById('carSelect').value;
@@ -126,19 +170,9 @@
             resultDisplay.textContent = "Racing...";
             resultDisplay.style.color = "var(--text-main)";
             
-            // 1. Optimistically deduct the wager from the UI immediately
             balanceEl.textContent = (currentBalance - amount).toFixed(2);
-
-            // 2. Instantly snap cars back to the start line without animation
-            const carElements = document.querySelectorAll('.car');
-            carElements.forEach(c => {
-                c.style.transition = 'none';
-                c.style.left = '0px';
-            });
+            resetBoard();
             
-            // Force the browser to render the snap before proceeding
-            void document.body.offsetHeight;
-
             try {
                 const response = await fetch('/api/race', {
                     method: 'POST',
@@ -150,32 +184,47 @@
                 
                 if (data.error) {
                     alert(data.error);
-                    // Refund the optimistic deduction on error
                     balanceEl.textContent = currentBalance.toFixed(2);
                     startBtn.disabled = false;
                     resultDisplay.textContent = "";
                     return;
                 }
 
-                // 3. Re-enable transition and animate the cars based on the backend's verified winner
                 const cars = ["Red", "Blue", "Green", "Yellow"];
+                let maxDuration = 0;
+
                 cars.forEach(c => {
                     const el = document.getElementById(`car-${c}`);
-                    if (c === data.winner) {
-                        // Winner crosses the finish line
-                        el.style.transition = `left ${2 + Math.random()}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
-                        el.style.left = '90%';
-                    } else {
-                        // Losers fall short randomly
-                        const randomStop = Math.floor(Math.random() * 40) + 40;
-                        el.style.transition = `left ${2.5 + Math.random()}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
-                        el.style.left = `${randomStop}%`;
-                    }
+                    const isWinner = (c === data.winner);
+                    
+                    const finalDistance = isWinner ? 100 : (Math.random() * 9 + 88); 
+                    const duration = 6500 + (Math.random() * 2000);
+                    if (duration > maxDuration) maxDuration = duration;
+
+                    let p1 = 20 + (Math.random() * 12 - 6);
+                    let p2 = 50 + (Math.random() * 15 - 7);
+                    let p3 = 75 + (Math.random() * 10 - 5);
+                    if (p3 >= finalDistance) p3 = finalDistance - 2;
+
+                    const keyframes = [
+                        { offsetDistance: '0%', offset: 0 },
+                        { offsetDistance: `${p1}%`, offset: 0.25 },
+                        { offsetDistance: `${p2}%`, offset: 0.5 },
+                        { offsetDistance: `${p3}%`, offset: 0.75 },
+                        { offsetDistance: `${finalDistance}%`, offset: 1 }
+                    ];
+
+                    const animation = el.animate(keyframes, {
+                        duration: duration,
+                        easing: 'ease-in-out',
+                        fill: 'forwards'
+                    });
+                    
+                    animation.onfinish = () => el.style.offsetDistance = `${finalDistance}%`;
+                    currentAnimations.push(animation);
                 });
 
-                // Wait for the animation to finish before updating wallet with winnings
                 setTimeout(() => {
-                    // Update to the true server balance (includes payout if won)
                     balanceEl.textContent = data.account.balance.toFixed(2);
                     
                     if (data.payout > 0) {
@@ -186,11 +235,10 @@
                         resultDisplay.textContent = `LOSS. Winner was ${data.winner}.`;
                     }
                     startBtn.disabled = false;
-                }, 3500);
+                }, maxDuration + 100);
 
             } catch (err) {
                 alert('Failed to place bet. Check connection.');
-                // Refund the optimistic deduction on error
                 balanceEl.textContent = currentBalance.toFixed(2);
                 startBtn.disabled = false;
                 resultDisplay.textContent = "";

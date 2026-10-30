@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermes Racing Minigame</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-bg: #2a2a2a;
+            --text-main: #f0f0f0;
+            --text-muted: #999;
+            --accent-red: #ee382b;
+            --accent-green: #84ee64;
+            --border-color: #444;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 2px solid var(--accent-red); margin-bottom: 20px; }
+        h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .account-info { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .ip-display { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+        .balance-display { font-size: 20px; font-weight: bold; color: var(--accent-green); background: #111; padding: 10px 20px; border-radius: 5px; border: 1px solid var(--border-color); }
+        
+        nav { margin-bottom: 20px; }
+        nav a { padding: 10px 20px; background: #333; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-right: 10px; border: 1px solid var(--border-color); }
+        nav a.active { background: var(--accent-red); border-color: var(--accent-red); }
+
+        .race-container { display: flex; gap: 20px; flex: 1; }
+        .track-panel { flex: 3; background: #222; border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: space-around; }
+        
+        .lane { position: relative; height: 60px; border-bottom: 2px dashed #555; display: flex; align-items: center; }
+        .lane:last-child { border-bottom: none; }
+        .finish-line { position: absolute; right: 10%; top: 0; bottom: 0; width: 10px; background: repeating-linear-gradient(45deg, #fff, #fff 10px, #000 10px, #000 20px); z-index: 1; }
+        
+        .car { position: absolute; left: 0; width: 60px; height: 30px; border-radius: 5px; z-index: 2; transition: left 3s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        #car-Red { background-color: #ff4444; }
+        #car-Blue { background-color: #4444ff; }
+        #car-Green { background-color: #44ff44; }
+        #car-Yellow { background-color: #ffff44; }
+
+        .betting-panel { flex: 1; background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; }
+        .betting-panel h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .betting-panel select, .betting-panel input { width: 100%; padding: 10px; margin-bottom: 15px; background: #111; color: white; border: 1px solid #555; border-radius: 4px; }
+        .betting-panel button { width: 100%; padding: 12px; background: var(--accent-green); color: black; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
+        .betting-panel button:disabled { background: #555; cursor: not-allowed; }
+
+        #raceResult { margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center; height: 30px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Hermes Live Sportsbook</h1>
+        <div class="account-info">
+            <div class="ip-display" id="userIp">Connecting...</div>
+            <div class="balance-display">Balance: $<span id="balance">0.00</span></div>
+        </div>
+    </header>
+
+    <nav>
+        <a href="/">Live Scoreboard</a>
+        <a href="/racing" class="active">Racing Minigame (4.0x Odds)</a>
+    </nav>
+
+    <div class="race-container">
+        <div class="track-panel">
+            <div class="finish-line"></div>
+            <div class="lane"><div class="car" id="car-Red"></div></div>
+            <div class="lane"><div class="car" id="car-Blue"></div></div>
+            <div class="lane"><div class="car" id="car-Green"></div></div>
+            <div class="lane"><div class="car" id="car-Yellow"></div></div>
+        </div>
+
+        <div class="betting-panel">
+            <h2>Place Race Bet</h2>
+            <p style="color: var(--text-muted); font-size: 14px;">Select a car. Winner pays 4.0x your wager.</p>
+            
+            <label>Select Car:</label>
+            <select id="carSelect">
+                <option value="Red">Red Car</option>
+                <option value="Blue">Blue Car</option>
+                <option value="Green">Green Car</option>
+                <option value="Yellow">Yellow Car</option>
+            </select>
+
+            <label>Wager Amount:</label>
+            <input type="number" id="betAmount" placeholder="Enter amount ($)" min="1">
+            
+            <button id="startRaceBtn">Lock Bet & Start Race</button>
+            <div id="raceResult"></div>
+        </div>
+    </div>
+
+    <script>
+        const balanceEl = document.getElementById('balance');
+        const userIpEl = document.getElementById('userIp');
+        const startBtn = document.getElementById('startRaceBtn');
+        const resultDisplay = document.getElementById('raceResult');
+
+        async function fetchAccount() {
+            try {
+                const response = await fetch('/api/account');
+                const data = await response.json();
+                if (data.ip) {
+                    userIpEl.textContent = `User IP: ${data.ip}`;
+                    balanceEl.textContent = data.account.balance.toFixed(2);
+                }
+            } catch (err) {
+                console.error("Failed to fetch account data");
+            }
+        }
+
+        fetchAccount();
+
+        startBtn.addEventListener('click', async () => {
+            const car = document.getElementById('carSelect').value;
+            const amount = parseFloat(document.getElementById('betAmount').value);
+            
+            if (isNaN(amount) || amount <= 0) return alert('Enter a valid bet amount.');
+
+            startBtn.disabled = true;
+            resultDisplay.textContent = "Racing...";
+            
+            // Reset car positions
+            document.querySelectorAll('.car').forEach(c => c.style.left = '0');
+
+            try {
+                const response = await fetch('/api/race', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ car: car, amount: amount })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    startBtn.disabled = false;
+                    resultDisplay.textContent = "";
+                    return;
+                }
+
+                // Animate the cars based on the backend's verified winner
+                const cars = ["Red", "Blue", "Green", "Yellow"];
+                cars.forEach(c => {
+                    const el = document.getElementById(`car-${c}`);
+                    if (c === data.winner) {
+                        // Winner crosses the finish line (90% width)
+                        el.style.transition = `left ${2 + Math.random()}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
+                        el.style.left = '90%';
+                    } else {
+                        // Losers fall short randomly between 40% and 80%
+                        const randomStop = Math.floor(Math.random() * 40) + 40;
+                        el.style.transition = `left ${2.5 + Math.random()}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
+                        el.style.left = `${randomStop}%`;
+                    }
+                });
+
+                // Wait for the animation to finish before updating wallet
+                setTimeout(() => {
+                    balanceEl.textContent = data.account.balance.toFixed(2);
+                    if (data.payout > 0) {
+                        resultDisplay.style.color = "var(--accent-green)";
+                        resultDisplay.textContent = `WIN! +$${data.payout.toFixed(2)}`;
+                    } else {
+                        resultDisplay.style.color = "var(--accent-red)";
+                        resultDisplay.textContent = `LOSS. Winner was ${data.winner}.`;
+                    }
+                    startBtn.disabled = false;
+                }, 3500);
+
+            } catch (err) {
+                alert('Failed to place bet. Check connection.');
+                startBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

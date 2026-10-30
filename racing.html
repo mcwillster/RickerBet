@@ -34,7 +34,7 @@
         .lane:last-child { border-bottom: none; }
         .finish-line { position: absolute; right: 10%; top: 0; bottom: 0; width: 10px; background: repeating-linear-gradient(45deg, #fff, #fff 10px, #000 10px, #000 20px); z-index: 1; }
         
-        .car { position: absolute; left: 0; width: 60px; height: 30px; border-radius: 5px; z-index: 2; transition: left 3s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        .car { position: absolute; left: 0; width: 60px; height: 30px; border-radius: 5px; z-index: 2; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
         #car-Red { background-color: #ff4444; }
         #car-Blue { background-color: #4444ff; }
         #car-Green { background-color: #44ff44; }
@@ -117,14 +117,27 @@
         startBtn.addEventListener('click', async () => {
             const car = document.getElementById('carSelect').value;
             const amount = parseFloat(document.getElementById('betAmount').value);
+            const currentBalance = parseFloat(balanceEl.textContent);
             
             if (isNaN(amount) || amount <= 0) return alert('Enter a valid bet amount.');
+            if (amount > currentBalance) return alert('Insufficient funds!');
 
             startBtn.disabled = true;
             resultDisplay.textContent = "Racing...";
+            resultDisplay.style.color = "var(--text-main)";
             
-            // Reset car positions
-            document.querySelectorAll('.car').forEach(c => c.style.left = '0');
+            // 1. Optimistically deduct the wager from the UI immediately
+            balanceEl.textContent = (currentBalance - amount).toFixed(2);
+
+            // 2. Instantly snap cars back to the start line without animation
+            const carElements = document.querySelectorAll('.car');
+            carElements.forEach(c => {
+                c.style.transition = 'none';
+                c.style.left = '0px';
+            });
+            
+            // Force the browser to render the snap before proceeding
+            void document.body.offsetHeight;
 
             try {
                 const response = await fetch('/api/race', {
@@ -137,30 +150,34 @@
                 
                 if (data.error) {
                     alert(data.error);
+                    // Refund the optimistic deduction on error
+                    balanceEl.textContent = currentBalance.toFixed(2);
                     startBtn.disabled = false;
                     resultDisplay.textContent = "";
                     return;
                 }
 
-                // Animate the cars based on the backend's verified winner
+                // 3. Re-enable transition and animate the cars based on the backend's verified winner
                 const cars = ["Red", "Blue", "Green", "Yellow"];
                 cars.forEach(c => {
                     const el = document.getElementById(`car-${c}`);
                     if (c === data.winner) {
-                        // Winner crosses the finish line (90% width)
+                        // Winner crosses the finish line
                         el.style.transition = `left ${2 + Math.random()}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
                         el.style.left = '90%';
                     } else {
-                        // Losers fall short randomly between 40% and 80%
+                        // Losers fall short randomly
                         const randomStop = Math.floor(Math.random() * 40) + 40;
                         el.style.transition = `left ${2.5 + Math.random()}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
                         el.style.left = `${randomStop}%`;
                     }
                 });
 
-                // Wait for the animation to finish before updating wallet
+                // Wait for the animation to finish before updating wallet with winnings
                 setTimeout(() => {
+                    // Update to the true server balance (includes payout if won)
                     balanceEl.textContent = data.account.balance.toFixed(2);
+                    
                     if (data.payout > 0) {
                         resultDisplay.style.color = "var(--accent-green)";
                         resultDisplay.textContent = `WIN! +$${data.payout.toFixed(2)}`;
@@ -173,7 +190,10 @@
 
             } catch (err) {
                 alert('Failed to place bet. Check connection.');
+                // Refund the optimistic deduction on error
+                balanceEl.textContent = currentBalance.toFixed(2);
                 startBtn.disabled = false;
+                resultDisplay.textContent = "";
             }
         });
     </script>
